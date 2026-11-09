@@ -1,0 +1,44 @@
+{
+  "name": "ayoub-battle-royale",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AYOUB BATTLE ROYALE - Android APK and Windows installer project",
+  "scripts": {
+    "web": "npx http-server www -p 8080",
+    "android:add": "npx cap add android",
+    "android:sync": "npx cap sync android",
+    "android:open": "npx cap open android",
+    "windows": "electron-builder --win nsis"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.2.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/android": "^6.2.1",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "http-server": "^14.1.1"
+  },
+  "build": {
+    "appId": "com.ayoub.battleroyale",
+    "productName": "AYOUB BATTLE ROYALE",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "www/**/*",
+      "electron-main.cjs"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "AYOUB-BATTLE-ROYALE-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
