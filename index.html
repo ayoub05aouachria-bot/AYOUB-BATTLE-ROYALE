@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#07111d">
+<title>AYOUB BATTLE ROYALE</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#183b55,#07111d 70%);color:#fff;font-family:Arial,sans-serif;text-align:center}
+header{padding:14px;background:#07111ddd;border-bottom:2px solid #00d9ff}h1{margin:4px;color:#00eaff;text-shadow:0 0 14px #00bfff;font-size:clamp(23px,5vw,36px)}
+.wrap{width:min(950px,96%);margin:14px auto}.panel{background:#10283c;border:1px solid #176080;border-radius:14px;padding:14px;margin-bottom:12px}
+button{border:0;border-radius:9px;padding:11px 15px;margin:4px;background:linear-gradient(135deg,#00c6ff,#0072ff);color:white;font-weight:bold;font-size:14px}
+button:disabled{opacity:.5}#game{display:none}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:9px}.stat{background:#0a1b2a;padding:8px;border-radius:8px;font-size:12px}.stat strong{display:block;color:#00eaff;font-size:18px;margin-top:4px}
+canvas{display:block;width:100%;background:#091925;border:2px solid #00d9ff;border-radius:10px;touch-action:none}
+#message{min-height:26px;color:#ffe66d;font-weight:bold;margin:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px}.skin{background:#091b2b;border:1px solid #28536c;border-radius:10px;padding:10px}.emoji{font-size:32px}.small{font-size:12px;color:#b9d9e9;line-height:1.8}
+#touch{display:none;justify-content:space-between;align-items:center;margin-top:8px;direction:ltr;touch-action:none}
+.pad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,42px);gap:3px}.pad button,.fire{margin:0;padding:4px;background:#174c68;border:1px solid #39c9ef}
+.pad button{font-size:20px}.fire{height:85px;width:85px;border-radius:50%;background:#a83232}
+@media(pointer:coarse){#touch{display:flex}}@media(max-width:500px){.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header><h1>⚔️ AYOUB BATTLE ROYALE ⚔️</h1><div class="small">قاتل، اجمع النجوم، وافتح الأبطال الأسطوريين</div></header>
+<div class="wrap">
+<section id="menu" class="panel"><h2>🔥 ساحة المعركة تنتظرك</h2><h3>⭐ النجوم: <span id="menuStars">0</span></h3>
+<button onclick="startGame()">🚀 ابدأ اللعبة</button><button onclick="showShop()" style="background:linear-gradient(135deg,#f9d423,#e89b00);color:#222">🛒 متجر الأبطال</button>
+<p class="small">الكمبيوتر: WASD أو الأسهم للحركة، Space لإطلاق الطاقة، P للإيقاف.</p></section>
+<section id="shop" class="panel" style="display:none"><h2>🛒 متجر الأبطال</h2><h3>⭐ رصيدك: <span id="shopStars">0</span></h3><div id="shopGrid" class="grid"></div><button onclick="hideShop()" style="background:#a83232">العودة</button></section>
+<section id="game">
+<div class="stats"><div class="stat">❤️ الحياة<strong id="hp">10</strong></div><div class="stat">🏆 المستوى<strong id="level">1</strong></div><div class="stat">🎯 النقاط<strong id="score">0</strong></div><div class="stat">⭐ النجوم<strong id="stars">0</strong></div></div>
+<canvas id="screen" width="900" height="520"></canvas><div id="message">استعد للمعركة!</div>
+<button id="pause" onclick="togglePause()">⏸️ إيقاف</button><button id="next" onclick="nextLevel()" style="display:none;background:#00a878">🚀 المستوى التالي</button><button onclick="backMenu()" style="background:#a83232">🏠 القائمة</button>
+<div id="touch"><div class="pad"><span></span><button data-key="arrowup">⬆</button><span></span><button data-key="arrowleft">⬅</button><button data-key="arrowdown">⬇</button><button data-key="arrowright">➡</button></div><button class="fire" id="fire">إطلاق<br>🔥</button></div>
+<p class="small">على الهاتف: استخدم أزرار الاتجاهات وزر إطلاق النار.</p>
+</section></div>
+<script>
+const canvas=document.getElementById('screen'),ctx=canvas.getContext('2d'),W=900,H=520;
+const skins=[{id:'blue',name:'المحارب الأزرق',icon:'🛡️',color:'#00cfff',price:0},{id:'fire',name:'ملك النار',icon:'🔥',color:'#ff512f',price:50},{id:'cosmic',name:'المحارب الكوني',icon:'🌌',color:'#bd5cff',price:100},{id:'gold',name:'ملك الذهب',icon:'👑',color:'#ffd700',price:200},{id:'dragon',name:'التنين الأسطوري',icon:'🐉',color:'#00ff99',price:350},{id:'dark',name:'إمبراطور الظلام',icon:'🌑',color:'#8d75ff',price:500}];
+let stars=0,owned=['blue'],equipped='blue',level=1,score=0,hp=10,defeated=0,player=null,enemies=[],bullets=[],particles=[],keys={},state='menu',paused=false,spawn=0,hitWait=0,shotWait=0,bossKilled=false,last=0,audio=null;
+try{const d=JSON.parse(localStorage.getItem('ayoubBattleSave')||'{}');if(Number.isFinite(d.stars))stars=Math.max(0,d.stars);if(Array.isArray(d.owned))owned=['blue',...d.owned.filter(x=>skins.some(s=>s.id===x))];if(owned.includes(d.equipped))equipped=d.equipped}catch(e){}
+function save(){try{localStorage.setItem('ayoubBattleSave',JSON.stringify({stars,owned,equipped}))}catch(e){}updateUI()}
+function updateUI(){['menuStars','shopStars','stars'].forEach(id=>{let e=document.getElementById(id);if(e)e.textContent=stars});['hp','level','score'].forEach(id=>{let e=document.getElementById(id);if(e)e.textContent=({hp,level,score})[id]})}
+function tone(f=450,d=.08){try{let A=window.AudioContext||window.webkitAudioContext;if(!A)return;if(!audio)audio=new A();if(audio.state==='suspended')audio.resume();let o=audio.createOscillator(),g=audio.createGain();o.frequency.value=f;o.type='triangle';g.gain.setValueAtTime(.07,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+d);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+d)}catch(e){}}
+function showShop(){if(state!=='menu')return;menu.style.display='none';shop.style.display='block';renderShop()}
+function hideShop(){shop.style.display='none';menu.style.display='block'}
+function renderShop(){shopGrid.innerHTML='';skins.forEach(s=>{let own=owned.includes(s.id),eq=equipped===s.id,c=document.createElement('div');c.className='skin';c.innerHTML=`<div class="emoji">${s.icon}</div><b>${s.name}</b><p style="color:#ffd85a">${s.price?`⭐ ${s.price}`:'مجاني'}</p>`;let b=document.createElement('button');b.textContent=eq?'✅ مجهز':own?'تجهيز':'شراء';b.disabled=eq||(!own&&stars<s.price);b.onclick=()=>{if(own)equipped=s.id;else if(stars>=s.price){stars-=s.price;owned.push(s.id);equipped=s.id}save();renderShop()};c.appendChild(b);shopGrid.appendChild(c)});updateUI()}
+function newPlayer(){return{x:450,y:260,r:16,speed:245,color:skins.find(s=>s.id===equipped).color}}
+function enemy(boss=false){let side=Math.floor(Math.random()*4),x=side===1?930:side===3?-30:Math.random()*900,y=side===0?-30:side===2?550:Math.random()*520;return{x,y,r:boss?37:14+Math.random()*4,speed:boss?52:55+level*2.5,hp:boss?180:1+Math.floor(level/12),max:boss?180:1+Math.floor(level/12),boss,damage:boss?2:1}}
+function startGame(){level=1;score=0;hp=10;menu.style.display='none';shop.style.display='none';game.style.display='block';begin()}
+function begin(){state='playing';paused=false;player=newPlayer();enemies=[];bullets=[];particles=[];defeated=0;spawn=0;hitWait=0;shotWait=0;bossKilled=false;pause.style.display='inline-block';pause.textContent='⏸️ إيقاف';next.style.display='none';message.textContent=level===45?'👹 الزعيم الأسطوري ظهر!':'⚔️ المستوى '+level;if(level===45)enemies.push(enemy(true));updateUI()}
+function togglePause(){if(state!=='playing')return;paused=!paused;pause.textContent=paused?'▶️ استئناف':'⏸️ إيقاف';message.textContent=paused?'اللعبة متوقفة مؤقتًا':'عدت إلى المعركة!'}
+function complete(){if(state!=='playing')return;let reward=level===45?200:5+level;stars+=reward;save();state=level===45?'victory':'complete';pause.style.display='none';next.style.display=level===45?'none':'inline-block';message.textContent=level===45?'👑 انتصرت على الزعيم! حصلت على 200 نجمة!':`🏆 أكملت المستوى ${level}! حصلت على ${reward} نجمة.`;tone(850,.25)}
+function nextLevel(){if(state!=='complete'||level>=45)return;level++;begin()}
+function backMenu(){state='menu';paused=false;game.style.display='none';menu.style.display='block';updateUI()}
+function shoot(){if(state!=='playing'||paused||shotWait>0||!enemies.length)return;let e=enemies.reduce((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)<Math.hypot(b.x-player.x,b.y-player.y)?a:b),d=Math.hypot(e.x-player.x,e.y-player.y)||1;bullets.push({x:player.x,y:player.y,vx:(e.x-player.x)/d*520,vy:(e.y-player.y)/d*520,r:6});shotWait=.22;tone(650,.05)}
+function burst(x,y,color){for(let i=0;i<8;i++){let a=Math.random()*6.28,v=45+Math.random()*120;particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,t:.5,color})}}
+function gameOver(){state='over';pause.style.display='none';next.style.display='none';message.textContent='💀 انتهت اللعبة! نقاطك: '+score;tone(130,.35)}
+function update(dt){if(state!=='playing'||paused)return;hitWait=Math.max(0,hitWait-dt);shotWait=Math.max(0,shotWait-dt);
+let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0),len=Math.hypot(dx,dy)||1;player.x=Math.max(16,Math.min(884,player.x+dx/len*player.speed*dt));player.y=Math.max(16,Math.min(504,player.y+dy/len*player.speed*dt));if(keys[' ']||keys.fire)shoot();
+if(level!==45){let target=4+level*2;spawn-=dt;if(defeated+enemies.length<target&&spawn<=0){enemies.push(enemy());spawn=Math.max(.35,1.2-level*.012)}if(defeated>=target&&!enemies.length){complete();return}}
+for(let e of enemies){let x=player.x-e.x,y=player.y-e.y,d=Math.hypot(x,y)||1;e.x+=x/d*e.speed*dt;e.y+=y/d*e.speed*dt;if(d<e.r+player.r&&hitWait<=0){hp-=e.damage;hitWait=.65;burst(player.x,player.y,'#ff4444');tone(170,.12);if(hp<=0){hp=0;updateUI();gameOver();return}}}
+for(let b of bullets){b.x+=b.vx*dt;b.y+=b.vy*dt}bullets=bullets.filter(b=>b.x>-20&&b.x<920&&b.y>-20&&b.y<540);
+for(let i=bullets.length-1;i>=0;i--){let b=bullets[i],hit=false;for(let j=enemies.length-1;j>=0;j--){let e=enemies[j];if(Math.hypot(b.x-e.x,b.y-e.y)<b.r+e.r){e.hp--;hit=true;burst(b.x,b.y,'#00eaff');if(e.hp<=0){enemies.splice(j,1);defeated++;score+=e.boss?500:10;if(e.boss)bossKilled=true;else stars+=2;save()}break}}if(hit)bullets.splice(i,1)}
+for(let p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.t-=dt}particles=particles.filter(p=>p.t>0);updateUI();if(level===45&&!enemies.length&&bossKilled)complete()}
+function draw(){ctx.fillStyle='#091925';ctx.fillRect(0,0,W,H);ctx.strokeStyle='rgba(0,200,255,.08)';for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}ctx.strokeStyle='#00bfff';ctx.lineWidth=3;ctx.strokeRect(2,2,W-4,H-4);
+if(player){ctx.save();ctx.shadowColor=player.color;ctx.shadowBlur=20;ctx.fillStyle=player.color;ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,7);ctx.fill();ctx.restore()}
+for(let e of enemies){ctx.save();ctx.fillStyle=e.boss?'#ff3030':'#ff713d';ctx.shadowColor='#ff3030';ctx.shadowBlur=e.boss?22:8;ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,7);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#333';ctx.fillRect(e.x-e.r,e.y-e.r-10,e.r*2,5);ctx.fillStyle='#37ed75';ctx.fillRect(e.x-e.r,e.y-e.r-10,e.r*2*Math.max(0,e.hp/e.max),5);if(e.boss){ctx.fillStyle='white';ctx.font='bold 15px Arial';ctx.textAlign='center';ctx.fillText('BOSS',e.x,e.y+5)}ctx.restore()}
+ctx.fillStyle='#00f5ff';for(let b of bullets){ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,7);ctx.fill()}
+for(let p of particles){ctx.globalAlpha=Math.max(0,p.t*2);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4)}ctx.globalAlpha=1;
+if(paused||state==='complete'||state==='victory'||state==='over'){ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(0,0,W,H);ctx.textAlign='center';ctx.fillStyle='#00eaff';ctx.font='bold 38px Arial';ctx.fillText(paused?'⏸️ PAUSED':state==='over'?'GAME OVER':state==='victory'?'👑 VICTORY!':'🏆 LEVEL COMPLETE',W/2,H/2)}}
+function loop(t){let dt=Math.min((t-last)/1000||0,.04);last=t;update(dt);if(game.style.display!=='none')draw();requestAnimationFrame(loop)}
+window.addEventListener('keydown',e=>{let k=e.key.toLowerCase();if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k))e.preventDefault();keys[k]=true;if(k==='p'&&!e.repeat)togglePause()});
+window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);window.addEventListener('blur',()=>{if(state==='playing'&&!paused)togglePause()});
+document.querySelectorAll('[data-key]').forEach(b=>{let k=b.dataset.key;b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true;b.setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>b.addEventListener(ev,()=>keys[k]=false))});
+fire.addEventListener('pointerdown',e=>{e.preventDefault();keys.fire=true});['pointerup','pointercancel','pointerleave'].forEach(ev=>fire.addEventListener(ev,()=>keys.fire=false));
+updateUI();requestAnimationFrame(loop);
+</script>
+</body></html>
